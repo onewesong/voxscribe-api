@@ -1,10 +1,11 @@
 import os
 import tempfile
-from typing import List, Optional
+from typing import List, Optional, Annotated
 
 import whisper
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Header, Security
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 
 app = FastAPI(
@@ -21,6 +22,38 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 获取环境变量中的API令牌
+API_TOKEN = os.environ.get("VOXSCRIBE_API_KEY")
+api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
+
+# 验证API令牌的依赖函数
+async def verify_token(authorization: str = Security(api_key_header)):
+    if not API_TOKEN:
+        # 如果环境变量中没有设置令牌，则不进行验证
+        return True
+    
+    if not authorization:
+        raise HTTPException(
+            status_code=401,
+            detail="缺少认证令牌",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # 检查令牌格式
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer":
+        # 尝试直接使用整个头作为令牌
+        token = authorization
+    
+    if token != API_TOKEN:
+        raise HTTPException(
+            status_code=401,
+            detail="认证令牌无效",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    return True
 
 # 可用的模型列表
 AVAILABLE_MODELS = ["tiny", "base", "small", "medium", "large", "tiny.en", "base.en", "small.en", "medium.en", "turbo"]
@@ -40,7 +73,7 @@ async def root():
     return {"message": "欢迎使用VoxScribe API，基于OpenAI的Whisper模型"}
 
 
-@app.get("/models")
+@app.get("/models", dependencies=[Depends(verify_token)])
 async def list_models():
     return {"models": AVAILABLE_MODELS}
 
@@ -58,7 +91,7 @@ def load_model(model_name: str):
     return models[model_name]
 
 
-@app.post("/transcribe", response_model=TranscriptionResponse)
+@app.post("/transcribe", response_model=TranscriptionResponse, dependencies=[Depends(verify_token)])
 async def transcribe_audio(
     file: UploadFile = File(...),
     model: str = Form("base"),

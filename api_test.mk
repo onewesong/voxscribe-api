@@ -15,6 +15,10 @@ test-models:
 	@echo "获取可用模型列表..."
 	@curl -s $(API_URL)/models
 
+test-models-with-token:
+	@echo "获取可用模型列表..."
+	@curl -s $(API_URL)/models -H "Authorization: Bearer $(VOXSCRIBE_API_KEY)"
+
 # 测试转录功能 (需要有测试音频文件)
 test-transcribe:
 	@if [ ! -f $(SAMPLE_AUDIO) ]; then \
