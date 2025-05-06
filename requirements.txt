@@ -1,0 +1,6 @@
+fastapi>=0.104.0
+uvicorn>=0.23.2
+python-multipart>=0.0.6
+openai-whisper>=1.1.10
+pydantic>=2.4.2
+ffmpeg-python>=0.2.0
